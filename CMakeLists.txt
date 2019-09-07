@@ -1,0 +1,9 @@
+zephyr_include_directories(boards)
+zephyr_include_directories(mac)
+zephyr_include_directories(radio)
+zephyr_include_directories(./)
+
+add_subdirectory_ifdef(CONFIG_HAS_SEMTECH_LORAMAC mac)
+add_subdirectory_ifdef(CONFIG_HAS_SEMTECH_RADIO_DRIVERS radio)
+add_subdirectory_ifdef(CONFIG_HAS_SEMTECH_RADIO_DRIVERS system)
+add_subdirectory_ifdef(CONFIG_HAS_SEMTECH_RADIO_DRIVERS boards)

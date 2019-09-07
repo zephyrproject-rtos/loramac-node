@@ -1,0 +1,1 @@
+zephyr_sources_ifdef(CONFIG_HAS_SEMTECH_SX1276 sx1276/sx1276.c)
