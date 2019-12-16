@@ -20,7 +20,7 @@
  *
  * \author    Gregory Cristian ( Semtech )
  */
-#include "delay-board.h"
+#include "boards/delay-board.h"
 #include "delay.h"
 
 void Delay( float s )

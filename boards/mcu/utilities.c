@@ -22,7 +22,7 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
-#include "utilities.h"
+#include "boards/utilities.h"
 
 /*!
  * Redefinition of rand() and srand() standard C functions.

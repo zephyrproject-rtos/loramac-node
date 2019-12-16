@@ -24,12 +24,12 @@
  */
 #include <math.h>
 #include <string.h>
-#include "utilities.h"
+#include "boards/utilities.h"
 #include "system/timer.h"
 #include "radio.h"
 #include "system/delay.h"
 #include "sx1276.h"
-#include "sx1276-board.h"
+#include "boards/sx1276-board.h"
 
 /*
  * Local types definition

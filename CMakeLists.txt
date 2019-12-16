@@ -1,4 +1,3 @@
-zephyr_include_directories(boards)
 zephyr_include_directories(mac)
 zephyr_include_directories(radio)
 zephyr_include_directories(./)
