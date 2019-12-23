@@ -16,10 +16,15 @@ zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/mac/LoRaMacCrypto
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/mac/LoRaMacParser.c)
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/mac/LoRaMacSerializer.c)
 
+zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/peripherals/soft-se/aes.c)
+zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/peripherals/soft-se/cmac.c)
+zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/peripherals/soft-se/soft-se.c)
+
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_SX1276 ../src/radio/sx1276/sx1276.c)
 
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/system/timer.c)
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/system/delay.c)
+zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/system/systime.c)
 
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/boards/mcu/utilities.c)
 
