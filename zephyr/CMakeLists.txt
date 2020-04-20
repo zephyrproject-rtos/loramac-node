@@ -22,6 +22,9 @@ zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/peripherals/soft-
 
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_SX1276 ../src/radio/sx1276/sx1276.c)
 
+zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_SX126X ../src/radio/sx126x/sx126x.c)
+zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_SX126X ../src/radio/sx126x/radio.c)
+
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/system/timer.c)
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/system/delay.c)
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/system/systime.c)
