@@ -196,18 +196,27 @@ void SX126xSetWhiteningSeed( uint16_t seed )
 
 uint32_t SX126xGetRandom( void )
 {
-    uint8_t buf[] = { 0, 0, 0, 0 };
+    uint32_t number = 0;
+    uint8_t regAnaLna = 0;
+    uint8_t regAnaMixer = 0;
+
+    regAnaLna = SX126xReadRegister( REG_ANA_LNA );
+    SX126xWriteRegister( REG_ANA_LNA, regAnaLna & ~( 1 << 0 ) );
+
+    regAnaMixer = SX126xReadRegister( REG_ANA_MIXER );
+    SX126xWriteRegister( REG_ANA_MIXER, regAnaMixer & ~( 1 << 7 ) );
 
     // Set radio in continuous reception
-    SX126xSetRx( 0 );
+    SX126xSetRx( 0xFFFFFF ); // Rx Continuous
 
-    DelayMs( 1 );
-
-    SX126xReadRegisters( RANDOM_NUMBER_GENERATORBASEADDR, buf, 4 );
+    SX126xReadRegisters( RANDOM_NUMBER_GENERATORBASEADDR, ( uint8_t* )&number, 4 );
 
     SX126xSetStandby( STDBY_RC );
 
-    return ( buf[0] << 24 ) | ( buf[1] << 16 ) | ( buf[2] << 8 ) | buf[3];
+    SX126xWriteRegister( REG_ANA_LNA, regAnaLna );
+    SX126xWriteRegister( REG_ANA_MIXER, regAnaMixer );
+
+    return number;
 }
 
 void SX126xSetSleep( SleepParams_t sleepConfig )
@@ -300,14 +309,14 @@ void SX126xSetCad( void )
 
 void SX126xSetTxContinuousWave( void )
 {
-    SX126xSetOperatingMode( MODE_TX );
     SX126xWriteCommand( RADIO_SET_TXCONTINUOUSWAVE, 0, 0 );
+    SX126xSetOperatingMode( MODE_TX );
 }
 
 void SX126xSetTxInfinitePreamble( void )
 {
-    SX126xSetOperatingMode( MODE_TX );
     SX126xWriteCommand( RADIO_SET_TXCONTINUOUSPREAMBLE, 0, 0 );
+    SX126xSetOperatingMode( MODE_TX );
 }
 
 void SX126xSetStopRxTimerOnPreambleDetect( bool enable )
@@ -315,9 +324,25 @@ void SX126xSetStopRxTimerOnPreambleDetect( bool enable )
     SX126xWriteCommand( RADIO_SET_STOPRXTIMERONPREAMBLE, ( uint8_t* )&enable, 1 );
 }
 
-void SX126xSetLoRaSymbNumTimeout( uint8_t SymbNum )
+void SX126xSetLoRaSymbNumTimeout( uint8_t symbNum )
 {
-    SX126xWriteCommand( RADIO_SET_LORASYMBTIMEOUT, &SymbNum, 1 );
+    SX126xWriteCommand( RADIO_SET_LORASYMBTIMEOUT, &symbNum, 1 );
+
+    if( symbNum >= 64 )
+    {
+        uint8_t mant = symbNum >> 1;
+        uint8_t exp  = 0;
+        uint8_t reg  = 0;
+
+        while( mant > 31 )
+        {
+            mant >>= 2;
+            exp++;
+        }
+
+        reg = exp + ( mant << 3 );
+        SX126xWriteRegister( REG_LR_SYNCH_TIMEOUT, reg );
+    }
 }
 
 void SX126xSetRegulatorMode( RadioRegulatorMode_t mode )
@@ -479,7 +504,6 @@ void SX126xSetTxParams( int8_t power, RadioRampTimes_t rampTime )
         {
             power = -17;
         }
-        SX126xWriteRegister( REG_OCP, 0x18 ); // current max is 80 mA for the whole device
     }
     else // sx1262
     {
@@ -497,7 +521,6 @@ void SX126xSetTxParams( int8_t power, RadioRampTimes_t rampTime )
         {
             power = -9;
         }
-        SX126xWriteRegister( REG_OCP, 0x38 ); // current max 160mA for the whole device
     }
     buf[0] = power;
     buf[1] = ( uint8_t )rampTime;

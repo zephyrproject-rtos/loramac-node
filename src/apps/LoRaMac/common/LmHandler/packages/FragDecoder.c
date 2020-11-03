@@ -280,7 +280,8 @@ void FragDecoderInit( uint16_t fragNb, uint8_t fragSize, uint8_t *file, uint32_t
 #if( FRAG_DECODER_FILE_HANDLING_NEW_API == 1 )
         if( ( FragDecoder.Callbacks != NULL ) && ( FragDecoder.Callbacks->FragDecoderWrite != NULL ) )
         {
-            FragDecoder.Callbacks->FragDecoderWrite( i, ( uint8_t[] ){ 0xFF }, 1 );
+            uint8_t buffer[1] = { 0xFF };
+            FragDecoder.Callbacks->FragDecoderWrite( i, buffer, 1 );
         }
 #else
         FragDecoder.File[i] = 0xFF;
@@ -654,9 +655,9 @@ static void FragFindMissingFrags( uint16_t counter )
     {
         FragDecoder.Status.FragNbLastRx = FragDecoder.FragNb + 1;
     }
-    DBG( "RECEIVED    : %5d / %5d Fragments\r\n", FragDecoder.Status.FragNbRx, FragDecoder.FragNb );
-    DBG( "              %5d / %5d Bytes\r\n", FragDecoder.Status.FragNbRx * FragDecoder.FragSize, FragDecoder.FragNb * FragDecoder.FragSize );
-    DBG( "LOST        :       %7d Fragments\r\n\r\n", FragDecoder.Status.FragNbLost );
+    DBG( "RECEIVED    : %5d / %5d Fragments\n", FragDecoder.Status.FragNbRx, FragDecoder.FragNb );
+    DBG( "              %5d / %5d Bytes\n", FragDecoder.Status.FragNbRx * FragDecoder.FragSize, FragDecoder.FragNb * FragDecoder.FragSize );
+    DBG( "LOST        :       %7d Fragments\n\n", FragDecoder.Status.FragNbLost );
 }
 
 /*!

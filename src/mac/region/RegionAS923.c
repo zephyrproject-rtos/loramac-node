@@ -34,7 +34,68 @@
 #include "RegionAS923.h"
 
 // Definitions
-#define CHANNELS_MASK_SIZE              1
+#define CHANNELS_MASK_SIZE                1
+
+#ifndef REGION_AS923_DEFAULT_CHANNEL_PLAN
+#define REGION_AS923_DEFAULT_CHANNEL_PLAN CHANNEL_PLAN_GROUP_AS923_1
+#endif
+
+#if( REGION_AS923_DEFAULT_CHANNEL_PLAN == CHANNEL_PLAN_GROUP_AS923_1 )
+
+// Channel plan CHANNEL_PLAN_GROUP_AS923_1
+
+#define REGION_AS923_FREQ_OFFSET          0
+
+#define AS923_MIN_RF_FREQUENCY            915000000
+#define AS923_MAX_RF_FREQUENCY            928000000
+
+#elif ( REGION_AS923_DEFAULT_CHANNEL_PLAN == CHANNEL_PLAN_GROUP_AS923_2 )
+
+// Channel plan CHANNEL_PLAN_GROUP_AS923_2
+// -1.8MHz
+#define REGION_AS923_FREQ_OFFSET          ( ( ~( 0xFFFFB9B0 ) + 1 ) * 100 )
+
+#define AS923_MIN_RF_FREQUENCY            915000000
+#define AS923_MAX_RF_FREQUENCY            928000000
+
+#elif ( REGION_AS923_DEFAULT_CHANNEL_PLAN == CHANNEL_PLAN_GROUP_AS923_3 )
+
+// Channel plan CHANNEL_PLAN_GROUP_AS923_3
+// -6.6MHz
+#define REGION_AS923_FREQ_OFFSET          ( ( ~( 0xFFFEFE30 ) + 1 ) * 100 )
+
+#define AS923_MIN_RF_FREQUENCY            915000000
+#define AS923_MAX_RF_FREQUENCY            928000000
+
+#elif ( REGION_AS923_DEFAULT_CHANNEL_PLAN == CHANNEL_PLAN_GROUP_AS923_1_JP )
+
+// Channel plan CHANNEL_PLAN_GROUP_AS923_1_JP
+
+#define REGION_AS923_FREQ_OFFSET          0
+
+/*!
+ * Restrict AS923 frequencies to channels 24 to 38
+ * Center frequencies 920.6 MHz to 923.4 MHz @ 200 kHz max bandwidth
+ */
+#define AS923_MIN_RF_FREQUENCY            920600000
+#define AS923_MAX_RF_FREQUENCY            923400000
+
+/*!
+ * Specifies the reception bandwidth to be used while executing the LBT
+ * Max channel bandwidth is 200 kHz
+ */
+#define AS923_LBT_RX_BANDWIDTH            200000
+
+#undef AS923_TX_MAX_DATARATE
+#define AS923_TX_MAX_DATARATE             DR_5
+
+#undef AS923_RX_MAX_DATARATE
+#define AS923_RX_MAX_DATARATE             DR_5
+
+#undef AS923_DEFAULT_MAX_EIRP
+#define AS923_DEFAULT_MAX_EIRP            13.0f
+
+#endif
 
 /*!
  * Region specific context
@@ -65,45 +126,6 @@ typedef struct sRegionAS923NvmCtx
 static RegionAS923NvmCtx_t NvmCtx;
 
 // Static functions
-static int8_t GetNextLowerTxDr( int8_t dr, int8_t minDr )
-{
-    uint8_t nextLowerDr = 0;
-
-    if( dr == minDr )
-    {
-        nextLowerDr = minDr;
-    }
-    else
-    {
-        nextLowerDr = dr - 1;
-    }
-    return nextLowerDr;
-}
-
-static uint32_t GetBandwidth( uint32_t drIndex )
-{
-    switch( BandwidthsAS923[drIndex] )
-    {
-        default:
-        case 125000:
-            return 0;
-        case 250000:
-            return 1;
-        case 500000:
-            return 2;
-    }
-}
-
-static int8_t LimitTxPower( int8_t txPower, int8_t maxBandTxPower, int8_t datarate, uint16_t* channelsMask )
-{
-    int8_t txPowerResult = txPower;
-
-    // Limit tx power to the band max
-    txPowerResult =  MAX( txPower, maxBandTxPower );
-
-    return txPowerResult;
-}
-
 static bool VerifyRfFreq( uint32_t freq )
 {
     // Check radio driver support
@@ -112,52 +134,28 @@ static bool VerifyRfFreq( uint32_t freq )
         return false;
     }
 
-    if( ( freq < 915000000 ) || ( freq > 928000000 ) )
+    if( ( freq < AS923_MIN_RF_FREQUENCY ) || ( freq > AS923_MAX_RF_FREQUENCY ) )
     {
         return false;
     }
     return true;
 }
 
-static uint8_t CountNbOfEnabledChannels( bool joined, uint8_t datarate, uint16_t* channelsMask, ChannelParams_t* channels, Band_t* bands, uint8_t* enabledChannels, uint8_t* delayTx )
+static TimerTime_t GetTimeOnAir( int8_t datarate, uint16_t pktLen )
 {
-    uint8_t nbEnabledChannels = 0;
-    uint8_t delayTransmission = 0;
+    int8_t phyDr = DataratesAS923[datarate];
+    uint32_t bandwidth = RegionCommonGetBandwidth( datarate, BandwidthsAS923 );
+    TimerTime_t timeOnAir = 0;
 
-    for( uint8_t i = 0, k = 0; i < AS923_MAX_NB_CHANNELS; i += 16, k++ )
-    {
-        for( uint8_t j = 0; j < 16; j++ )
-        {
-            if( ( channelsMask[k] & ( 1 << j ) ) != 0 )
-            {
-                if( channels[i + j].Frequency == 0 )
-                { // Check if the channel is enabled
-                    continue;
-                }
-                if( joined == false )
-                {
-                    if( ( AS923_JOIN_CHANNELS & ( 1 << j ) ) == 0 )
-                    {
-                        continue;
-                    }
-                }
-                if( RegionCommonValueInRange( datarate, channels[i + j].DrRange.Fields.Min,
-                                              channels[i + j].DrRange.Fields.Max ) == false )
-                { // Check if the current channel selection supports the given datarate
-                    continue;
-                }
-                if( bands[channels[i + j].Band].TimeOff > 0 )
-                { // Check if the band is available for transmission
-                    delayTransmission++;
-                    continue;
-                }
-                enabledChannels[nbEnabledChannels++] = i + j;
-            }
-        }
+    if( datarate == DR_7 )
+    { // High Speed FSK channel
+        timeOnAir = Radio.TimeOnAir( MODEM_FSK, bandwidth, phyDr * 1000, 0, 5, false, pktLen, true );
     }
-
-    *delayTx = delayTransmission;
-    return nbEnabledChannels;
+    else
+    {
+        timeOnAir = Radio.TimeOnAir( MODEM_LORA, bandwidth, phyDr, 1, 8, false, pktLen, true );
+    }
+    return timeOnAir;
 }
 
 PhyParam_t RegionAS923GetPhyParam( GetPhyParams_t* getPhy )
@@ -199,11 +197,11 @@ PhyParam_t RegionAS923GetPhyParam( GetPhyParams_t* getPhy )
         {
             if( getPhy->UplinkDwellTime == 0 )
             {
-                phyParam.Value = GetNextLowerTxDr( getPhy->Datarate, AS923_TX_MIN_DATARATE );
+                phyParam.Value = RegionCommonGetNextLowerTxDr( getPhy->Datarate, AS923_TX_MIN_DATARATE );
             }
             else
             {
-                phyParam.Value = GetNextLowerTxDr( getPhy->Datarate, AS923_DWELL_LIMIT_DATARATE );
+                phyParam.Value = RegionCommonGetNextLowerTxDr( getPhy->Datarate, AS923_DWELL_LIMIT_DATARATE );
             }
             break;
         }
@@ -219,12 +217,12 @@ PhyParam_t RegionAS923GetPhyParam( GetPhyParams_t* getPhy )
         }
         case PHY_DEF_ADR_ACK_LIMIT:
         {
-            phyParam.Value = AS923_ADR_ACK_LIMIT;
+            phyParam.Value = REGION_COMMON_DEFAULT_ADR_ACK_LIMIT;
             break;
         }
         case PHY_DEF_ADR_ACK_DELAY:
         {
-            phyParam.Value = AS923_ADR_ACK_DELAY;
+            phyParam.Value = REGION_COMMON_DEFAULT_ADR_ACK_DELAY;
             break;
         }
         case PHY_MAX_PAYLOAD:
@@ -235,19 +233,7 @@ PhyParam_t RegionAS923GetPhyParam( GetPhyParams_t* getPhy )
             }
             else
             {
-                phyParam.Value = MaxPayloadOfDatarateDwell1UpAS923[getPhy->Datarate];
-            }
-            break;
-        }
-        case PHY_MAX_PAYLOAD_REPEATER:
-        {
-            if( getPhy->UplinkDwellTime == 0 )
-            {
-                phyParam.Value = MaxPayloadOfDatarateRepeaterDwell0AS923[getPhy->Datarate];
-            }
-            else
-            {
-                phyParam.Value = MaxPayloadOfDatarateDwell1UpAS923[getPhy->Datarate];
+                phyParam.Value = MaxPayloadOfDatarateDwell1AS923[getPhy->Datarate];
             }
             break;
         }
@@ -263,42 +249,42 @@ PhyParam_t RegionAS923GetPhyParam( GetPhyParams_t* getPhy )
         }
         case PHY_RECEIVE_DELAY1:
         {
-            phyParam.Value = AS923_RECEIVE_DELAY1;
+            phyParam.Value = REGION_COMMON_DEFAULT_RECEIVE_DELAY1;
             break;
         }
         case PHY_RECEIVE_DELAY2:
         {
-            phyParam.Value = AS923_RECEIVE_DELAY2;
+            phyParam.Value = REGION_COMMON_DEFAULT_RECEIVE_DELAY2;
             break;
         }
         case PHY_JOIN_ACCEPT_DELAY1:
         {
-            phyParam.Value = AS923_JOIN_ACCEPT_DELAY1;
+            phyParam.Value = REGION_COMMON_DEFAULT_JOIN_ACCEPT_DELAY1;
             break;
         }
         case PHY_JOIN_ACCEPT_DELAY2:
         {
-            phyParam.Value = AS923_JOIN_ACCEPT_DELAY2;
+            phyParam.Value = REGION_COMMON_DEFAULT_JOIN_ACCEPT_DELAY2;
             break;
         }
         case PHY_MAX_FCNT_GAP:
         {
-            phyParam.Value = AS923_MAX_FCNT_GAP;
+            phyParam.Value = REGION_COMMON_DEFAULT_MAX_FCNT_GAP;
             break;
         }
         case PHY_ACK_TIMEOUT:
         {
-            phyParam.Value = ( AS923_ACKTIMEOUT + randr( -AS923_ACK_TIMEOUT_RND, AS923_ACK_TIMEOUT_RND ) );
+            phyParam.Value = ( REGION_COMMON_DEFAULT_ACK_TIMEOUT + randr( -REGION_COMMON_DEFAULT_ACK_TIMEOUT_RND, REGION_COMMON_DEFAULT_ACK_TIMEOUT_RND ) );
             break;
         }
         case PHY_DEF_DR1_OFFSET:
         {
-            phyParam.Value = AS923_DEFAULT_RX1_DR_OFFSET;
+            phyParam.Value = REGION_COMMON_DEFAULT_RX1_DR_OFFSET;
             break;
         }
         case PHY_DEF_RX2_FREQUENCY:
         {
-            phyParam.Value = AS923_RX_WND_2_FREQ;
+            phyParam.Value = AS923_RX_WND_2_FREQ - REGION_AS923_FREQ_OFFSET;
             break;
         }
         case PHY_DEF_RX2_DR:
@@ -333,7 +319,7 @@ PhyParam_t RegionAS923GetPhyParam( GetPhyParams_t* getPhy )
         }
         case PHY_DEF_DOWNLINK_DWELL_TIME:
         {
-            phyParam.Value = AS923_DEFAULT_DOWNLINK_DWELL_TIME;
+            phyParam.Value = REGION_COMMON_DEFAULT_DOWNLINK_DWELL_TIME;
             break;
         }
         case PHY_DEF_MAX_EIRP:
@@ -348,7 +334,7 @@ PhyParam_t RegionAS923GetPhyParam( GetPhyParams_t* getPhy )
         }
         case PHY_BEACON_CHANNEL_FREQ:
         {
-            phyParam.Value = AS923_BEACON_CHANNEL_FREQ;
+            phyParam.Value = AS923_BEACON_CHANNEL_FREQ - REGION_AS923_FREQ_OFFSET;
             break;
         }
         case PHY_BEACON_FORMAT:
@@ -363,9 +349,24 @@ PhyParam_t RegionAS923GetPhyParam( GetPhyParams_t* getPhy )
             phyParam.Value = AS923_BEACON_CHANNEL_DR;
             break;
         }
+        case PHY_PING_SLOT_CHANNEL_FREQ:
+        {
+            phyParam.Value = AS923_PING_SLOT_CHANNEL_FREQ;
+            break;
+        }
         case PHY_PING_SLOT_CHANNEL_DR:
         {
             phyParam.Value = AS923_PING_SLOT_CHANNEL_DR;
+            break;
+        }
+        case PHY_SF_FROM_DR:
+        {
+            phyParam.Value = DataratesAS923[getPhy->Datarate];
+            break;
+        }
+        case PHY_BW_FROM_DR:
+        {
+            phyParam.Value = RegionCommonGetBandwidth( getPhy->Datarate, BandwidthsAS923 );
             break;
         }
         default:
@@ -379,7 +380,8 @@ PhyParam_t RegionAS923GetPhyParam( GetPhyParams_t* getPhy )
 
 void RegionAS923SetBandTxDone( SetBandTxDoneParams_t* txDone )
 {
-    RegionCommonSetBandTxDone( txDone->Joined, &NvmCtx.Bands[NvmCtx.Channels[txDone->Channel].Band], txDone->LastTxDoneTime );
+    RegionCommonSetBandTxDone( &NvmCtx.Bands[NvmCtx.Channels[txDone->Channel].Band],
+                               txDone->LastTxAirTime, txDone->Joined, txDone->ElapsedTimeSinceStartUp );
 }
 
 void RegionAS923InitDefaults( InitDefaultsParams_t* params )
@@ -391,19 +393,39 @@ void RegionAS923InitDefaults( InitDefaultsParams_t* params )
 
     switch( params->Type )
     {
-        case INIT_TYPE_INIT:
+        case INIT_TYPE_DEFAULTS:
         {
-            // Initialize bands
+            // Default bands
             memcpy1( ( uint8_t* )NvmCtx.Bands, ( uint8_t* )bands, sizeof( Band_t ) * AS923_MAX_NB_BANDS );
 
-            // Channels
+            // Default channels
             NvmCtx.Channels[0] = ( ChannelParams_t ) AS923_LC1;
             NvmCtx.Channels[1] = ( ChannelParams_t ) AS923_LC2;
 
-            // Initialize the channels default mask
+            // Apply frequency offset
+            NvmCtx.Channels[0].Frequency -= REGION_AS923_FREQ_OFFSET;
+            NvmCtx.Channels[1].Frequency -= REGION_AS923_FREQ_OFFSET;
+
+            // Default ChannelsMask
             NvmCtx.ChannelsDefaultMask[0] = LC( 1 ) + LC( 2 );
+
             // Update the channels mask
-            RegionCommonChanMaskCopy( NvmCtx.ChannelsMask, NvmCtx.ChannelsDefaultMask, 1 );
+            RegionCommonChanMaskCopy( NvmCtx.ChannelsMask, NvmCtx.ChannelsDefaultMask, CHANNELS_MASK_SIZE );
+            break;
+        }
+        case INIT_TYPE_RESET_TO_DEFAULT_CHANNELS:
+        {
+            // Reset Channels Rx1Frequency to default 0
+            NvmCtx.Channels[0].Rx1Frequency = 0;
+            NvmCtx.Channels[1].Rx1Frequency = 0;
+            // Update the channels mask
+            RegionCommonChanMaskCopy( NvmCtx.ChannelsMask, NvmCtx.ChannelsDefaultMask, CHANNELS_MASK_SIZE );
+            break;
+        }
+        case INIT_TYPE_ACTIVATE_DEFAULT_CHANNELS:
+        {
+            // Activate channels default mask
+            NvmCtx.ChannelsMask[0] |= NvmCtx.ChannelsDefaultMask[0];
             break;
         }
         case INIT_TYPE_RESTORE_CTX:
@@ -412,16 +434,6 @@ void RegionAS923InitDefaults( InitDefaultsParams_t* params )
             {
                 memcpy1( (uint8_t*) &NvmCtx, (uint8_t*) params->NvmCtx, sizeof( NvmCtx ) );
             }
-            break;
-        }
-        case INIT_TYPE_RESTORE_DEFAULT_CHANNELS:
-        {
-            // Restore channels default mask
-            NvmCtx.ChannelsMask[0] |= NvmCtx.ChannelsDefaultMask[0];
-
-            // Channels
-            NvmCtx.Channels[0] = ( ChannelParams_t ) AS923_LC1;
-            NvmCtx.Channels[1] = ( ChannelParams_t ) AS923_LC2;
             break;
         }
         default:
@@ -567,29 +579,28 @@ bool RegionAS923ChanMaskSet( ChanMaskSetParams_t* chanMaskSet )
 
 void RegionAS923ComputeRxWindowParameters( int8_t datarate, uint8_t minRxSymbols, uint32_t rxError, RxConfigParams_t *rxConfigParams )
 {
-    double tSymbol = 0.0;
+    uint32_t tSymbolInUs = 0;
 
     // Get the datarate, perform a boundary check
     rxConfigParams->Datarate = MIN( datarate, AS923_RX_MAX_DATARATE );
-    rxConfigParams->Bandwidth = GetBandwidth( rxConfigParams->Datarate );
+    rxConfigParams->Bandwidth = RegionCommonGetBandwidth( rxConfigParams->Datarate, BandwidthsAS923 );
 
     if( rxConfigParams->Datarate == DR_7 )
     { // FSK
-        tSymbol = RegionCommonComputeSymbolTimeFsk( DataratesAS923[rxConfigParams->Datarate] );
+        tSymbolInUs = RegionCommonComputeSymbolTimeFsk( DataratesAS923[rxConfigParams->Datarate] );
     }
     else
     { // LoRa
-        tSymbol = RegionCommonComputeSymbolTimeLoRa( DataratesAS923[rxConfigParams->Datarate], BandwidthsAS923[rxConfigParams->Datarate] );
+        tSymbolInUs = RegionCommonComputeSymbolTimeLoRa( DataratesAS923[rxConfigParams->Datarate], BandwidthsAS923[rxConfigParams->Datarate] );
     }
 
-    RegionCommonComputeRxWindowParameters( tSymbol, minRxSymbols, rxError, Radio.GetWakeupTime( ), &rxConfigParams->WindowTimeout, &rxConfigParams->WindowOffset );
+    RegionCommonComputeRxWindowParameters( tSymbolInUs, minRxSymbols, rxError, Radio.GetWakeupTime( ), &rxConfigParams->WindowTimeout, &rxConfigParams->WindowOffset );
 }
 
 bool RegionAS923RxConfig( RxConfigParams_t* rxConfig, int8_t* datarate )
 {
     RadioModems_t modem;
     int8_t dr = rxConfig->Datarate;
-    uint8_t maxPayload = 0;
     int8_t phyDr = 0;
     uint32_t frequency = rxConfig->Frequency;
 
@@ -626,17 +637,7 @@ bool RegionAS923RxConfig( RxConfigParams_t* rxConfig, int8_t* datarate )
         Radio.SetRxConfig( modem, rxConfig->Bandwidth, phyDr, 1, 0, 8, rxConfig->WindowTimeout, false, 0, false, 0, 0, true, rxConfig->RxContinuous );
     }
 
-    // Check for repeater support
-    if( rxConfig->RepeaterSupport == true )
-    {
-        maxPayload = MaxPayloadOfDatarateRepeaterDwell0AS923[dr];
-    }
-    else
-    {
-        maxPayload = MaxPayloadOfDatarateDwell0AS923[dr];
-    }
-
-    Radio.SetMaxPayloadLength( modem, maxPayload + LORA_MAC_FRMPAYLOAD_OVERHEAD );
+    Radio.SetMaxPayloadLength( modem, MaxPayloadOfDatarateDwell0AS923[dr] + LORAMAC_FRAME_PAYLOAD_OVERHEAD_SIZE );
 
     *datarate = (uint8_t) dr;
     return true;
@@ -646,8 +647,8 @@ bool RegionAS923TxConfig( TxConfigParams_t* txConfig, int8_t* txPower, TimerTime
 {
     RadioModems_t modem;
     int8_t phyDr = DataratesAS923[txConfig->Datarate];
-    int8_t txPowerLimited = LimitTxPower( txConfig->TxPower, NvmCtx.Bands[NvmCtx.Channels[txConfig->Channel].Band].TxMaxPower, txConfig->Datarate, NvmCtx.ChannelsMask );
-    uint32_t bandwidth = GetBandwidth( txConfig->Datarate );
+    int8_t txPowerLimited = RegionCommonLimitTxPower( txConfig->TxPower, NvmCtx.Bands[NvmCtx.Channels[txConfig->Channel].Band].TxMaxPower );
+    uint32_t bandwidth = RegionCommonGetBandwidth( txConfig->Datarate, BandwidthsAS923 );
     int8_t phyTxPower = 0;
 
     // Calculate physical TX power
@@ -667,10 +668,11 @@ bool RegionAS923TxConfig( TxConfigParams_t* txConfig, int8_t* txPower, TimerTime
         Radio.SetTxConfig( modem, phyTxPower, 0, bandwidth, phyDr, 1, 8, false, true, 0, 0, false, 4000 );
     }
 
+    // Update time-on-air
+    *txTimeOnAir = GetTimeOnAir( txConfig->Datarate, txConfig->PktLen );
+
     // Setup maximum payload lenght of the radio driver
     Radio.SetMaxPayloadLength( modem, txConfig->PktLen );
-    // Get the time-on-air of the next tx frame
-    *txTimeOnAir = Radio.TimeOnAir( modem, txConfig->PktLen );
 
     *txPower = txPowerLimited;
     return true;
@@ -679,7 +681,7 @@ bool RegionAS923TxConfig( TxConfigParams_t* txConfig, int8_t* txPower, TimerTime
 uint8_t RegionAS923LinkAdrReq( LinkAdrReqParams_t* linkAdrReq, int8_t* drOut, int8_t* txPowOut, uint8_t* nbRepOut, uint8_t* nbBytesParsed )
 {
     uint8_t status = 0x07;
-    RegionCommonLinkAdrParams_t linkAdrParams;
+    RegionCommonLinkAdrParams_t linkAdrParams = { 0 };
     uint8_t nextIndex = 0;
     uint8_t bytesProcessed = 0;
     uint16_t chMask = 0;
@@ -896,57 +898,50 @@ int8_t RegionAS923AlternateDr( int8_t currentDr, AlternateDrType_t type )
     return AS923_DWELL_LIMIT_DATARATE;
 }
 
-void RegionAS923CalcBackOff( CalcBackOffParams_t* calcBackOff )
-{
-    RegionCommonCalcBackOffParams_t calcBackOffParams;
-
-    calcBackOffParams.Channels = NvmCtx.Channels;
-    calcBackOffParams.Bands = NvmCtx.Bands;
-    calcBackOffParams.LastTxIsJoinRequest = calcBackOff->LastTxIsJoinRequest;
-    calcBackOffParams.Joined = calcBackOff->Joined;
-    calcBackOffParams.DutyCycleEnabled = calcBackOff->DutyCycleEnabled;
-    calcBackOffParams.Channel = calcBackOff->Channel;
-    calcBackOffParams.ElapsedTime = calcBackOff->ElapsedTime;
-    calcBackOffParams.TxTimeOnAir = calcBackOff->TxTimeOnAir;
-
-    RegionCommonCalcBackOff( &calcBackOffParams );
-}
-
 LoRaMacStatus_t RegionAS923NextChannel( NextChanParams_t* nextChanParams, uint8_t* channel, TimerTime_t* time, TimerTime_t* aggregatedTimeOff )
 {
-    uint8_t channelNext = 0;
     uint8_t nbEnabledChannels = 0;
-    uint8_t delayTx = 0;
+    uint8_t nbRestrictedChannels = 0;
     uint8_t enabledChannels[AS923_MAX_NB_CHANNELS] = { 0 };
-    TimerTime_t nextTxDelay = 0;
+    RegionCommonIdentifyChannelsParam_t identifyChannelsParam;
+    RegionCommonCountNbOfEnabledChannelsParams_t countChannelsParams;
+    LoRaMacStatus_t status = LORAMAC_STATUS_NO_CHANNEL_FOUND;
+    uint16_t joinChannels = AS923_JOIN_CHANNELS;
 
     if( RegionCommonCountChannels( NvmCtx.ChannelsMask, 0, 1 ) == 0 )
     { // Reactivate default channels
         NvmCtx.ChannelsMask[0] |= LC( 1 ) + LC( 2 );
     }
 
-    TimerTime_t elapsed = TimerGetElapsedTime( nextChanParams->LastAggrTx );
-    if( ( nextChanParams->LastAggrTx == 0 ) || ( nextChanParams->AggrTimeOff <= elapsed ) )
-    {
-        // Reset Aggregated time off
-        *aggregatedTimeOff = 0;
+    // Search how many channels are enabled
+    countChannelsParams.Joined = nextChanParams->Joined;
+    countChannelsParams.Datarate = nextChanParams->Datarate;
+    countChannelsParams.ChannelsMask = NvmCtx.ChannelsMask;
+    countChannelsParams.Channels = NvmCtx.Channels;
+    countChannelsParams.Bands = NvmCtx.Bands;
+    countChannelsParams.MaxNbChannels = AS923_MAX_NB_CHANNELS;
+    countChannelsParams.JoinChannels = &joinChannels;
 
-        // Update bands Time OFF
-        nextTxDelay = RegionCommonUpdateBandTimeOff( nextChanParams->Joined, nextChanParams->DutyCycleEnabled, NvmCtx.Bands, AS923_MAX_NB_BANDS );
+    identifyChannelsParam.AggrTimeOff = nextChanParams->AggrTimeOff;
+    identifyChannelsParam.LastAggrTx = nextChanParams->LastAggrTx;
+    identifyChannelsParam.DutyCycleEnabled = nextChanParams->DutyCycleEnabled;
+    identifyChannelsParam.MaxBands = AS923_MAX_NB_BANDS;
 
-        // Search how many channels are enabled
-        nbEnabledChannels = CountNbOfEnabledChannels( nextChanParams->Joined, nextChanParams->Datarate,
-                                                      NvmCtx.ChannelsMask, NvmCtx.Channels,
-                                                      NvmCtx.Bands, enabledChannels, &delayTx );
-    }
-    else
-    {
-        delayTx++;
-        nextTxDelay = nextChanParams->AggrTimeOff - elapsed;
-    }
+    identifyChannelsParam.ElapsedTimeSinceStartUp = nextChanParams->ElapsedTimeSinceStartUp;
+    identifyChannelsParam.LastTxIsJoinRequest = nextChanParams->LastTxIsJoinRequest;
+    identifyChannelsParam.ExpectedTimeOnAir = GetTimeOnAir( nextChanParams->Datarate, nextChanParams->PktLen );
 
-    if( nbEnabledChannels > 0 )
+    identifyChannelsParam.CountNbOfEnabledChannelsParam = &countChannelsParams;
+
+    status = RegionCommonIdentifyChannels( &identifyChannelsParam, aggregatedTimeOff, enabledChannels,
+                                           &nbEnabledChannels, &nbRestrictedChannels, time );
+
+    if( status == LORAMAC_STATUS_OK )
     {
+#if ( REGION_AS923_DEFAULT_CHANNEL_PLAN == CHANNEL_PLAN_GROUP_AS923_1_JP )
+        // Executes the LBT algorithm when operating in Japan
+        uint8_t channelNext = 0;
+
         for( uint8_t  i = 0, j = randr( 0, nbEnabledChannels - 1 ); i < AS923_MAX_NB_CHANNELS; i++ )
         {
             channelNext = enabledChannels[j];
@@ -954,29 +949,27 @@ LoRaMacStatus_t RegionAS923NextChannel( NextChanParams_t* nextChanParams, uint8_
 
             // Perform carrier sense for AS923_CARRIER_SENSE_TIME
             // If the channel is free, we can stop the LBT mechanism
-            if( Radio.IsChannelFree( MODEM_LORA, NvmCtx.Channels[channelNext].Frequency, AS923_RSSI_FREE_TH, AS923_CARRIER_SENSE_TIME ) == true )
+            if( Radio.IsChannelFree( NvmCtx.Channels[channelNext].Frequency, AS923_LBT_RX_BANDWIDTH, AS923_RSSI_FREE_TH, AS923_CARRIER_SENSE_TIME ) == true )
             {
                 // Free channel found
                 *channel = channelNext;
-                *time = 0;
                 return LORAMAC_STATUS_OK;
             }
         }
-        return LORAMAC_STATUS_NO_FREE_CHANNEL_FOUND;
+        // Even if one or more channels are available according to the channel plan, no free channel
+        // was found during the LBT procedure.
+        status = LORAMAC_STATUS_NO_FREE_CHANNEL_FOUND;
+#else
+        // We found a valid channel
+        *channel = enabledChannels[randr( 0, nbEnabledChannels - 1 )];
+#endif
     }
-    else
+    else if( status == LORAMAC_STATUS_NO_CHANNEL_FOUND )
     {
-        if( delayTx > 0 )
-        {
-            // Delay transmission due to AggregatedTimeOff or to a band time off
-            *time = nextTxDelay;
-            return LORAMAC_STATUS_DUTYCYCLE_RESTRICTED;
-        }
         // Datarate not supported by any channel, restore defaults
         NvmCtx.ChannelsMask[0] |= LC( 1 ) + LC( 2 );
-        *time = 0;
-        return LORAMAC_STATUS_NO_CHANNEL_FOUND;
     }
+    return status;
 }
 
 LoRaMacStatus_t RegionAS923ChannelAdd( ChannelAddParams_t* channelAdd )
@@ -1055,7 +1048,7 @@ bool RegionAS923ChannelsRemove( ChannelRemoveParams_t* channelRemove  )
 
 void RegionAS923SetContinuousWave( ContinuousWaveParams_t* continuousWave )
 {
-    int8_t txPowerLimited = LimitTxPower( continuousWave->TxPower, NvmCtx.Bands[NvmCtx.Channels[continuousWave->Channel].Band].TxMaxPower, continuousWave->Datarate, NvmCtx.ChannelsMask );
+    int8_t txPowerLimited = RegionCommonLimitTxPower( continuousWave->TxPower, NvmCtx.Bands[NvmCtx.Channels[continuousWave->Channel].Band].TxMaxPower );
     int8_t phyTxPower = 0;
     uint32_t frequency = NvmCtx.Channels[continuousWave->Channel].Frequency;
 

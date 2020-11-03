@@ -95,11 +95,6 @@ extern "C"
 #define KR920_MAX_RX1_DR_OFFSET                     5
 
 /*!
- * Default Rx1 receive datarate offset
- */
-#define KR920_DEFAULT_RX1_DR_OFFSET                 0
-
-/*!
  * Minimal Tx output power that can be used by the node
  */
 #define KR920_MIN_TX_POWER                          TX_POWER_7
@@ -130,16 +125,6 @@ extern "C"
 #define KR920_DEFAULT_ANTENNA_GAIN                  2.15f
 
 /*!
- * ADR Ack limit
- */
-#define KR920_ADR_ACK_LIMIT                         64
-
-/*!
- * ADR Ack delay
- */
-#define KR920_ADR_ACK_DELAY                         32
-
-/*!
  * Enabled or disabled the duty cycle
  */
 #define KR920_DUTY_CYCLE_ENABLED                    0
@@ -148,41 +133,6 @@ extern "C"
  * Maximum RX window duration
  */
 #define KR920_MAX_RX_WINDOW                         4000
-
-/*!
- * Receive delay 1
- */
-#define KR920_RECEIVE_DELAY1                        1000
-
-/*!
- * Receive delay 2
- */
-#define KR920_RECEIVE_DELAY2                        2000
-
-/*!
- * Join accept delay 1
- */
-#define KR920_JOIN_ACCEPT_DELAY1                    5000
-
-/*!
- * Join accept delay 2
- */
-#define KR920_JOIN_ACCEPT_DELAY2                    6000
-
-/*!
- * Maximum frame counter gap
- */
-#define KR920_MAX_FCNT_GAP                          16384
-
-/*!
- * Ack timeout
- */
-#define KR920_ACKTIMEOUT                            2000
-
-/*!
- * Random ack timeout limits
- */
-#define KR920_ACK_TIMEOUT_RND                       1000
 
 #if ( KR920_DEFAULT_DATARATE > DR_5 )
 #error "A default DR higher than DR_5 may lead to connectivity loss."
@@ -198,6 +148,11 @@ extern "C"
  */
 #define KR920_RX_WND_2_DR                           DR_0
 
+/*!
+ * Default uplink dwell time configuration
+ */
+#define KR920_DEFAULT_UPLINK_DWELL_TIME             0
+
 /*
  * CLASS B
  */
@@ -205,6 +160,11 @@ extern "C"
  * Beacon frequency
  */
 #define KR920_BEACON_CHANNEL_FREQ                   923100000
+
+/*!
+ * Ping slot channel frequency
+ */
+#define KR920_PING_SLOT_CHANNEL_FREQ                923100000
 
 /*!
  * Payload size of a beacon frame
@@ -243,9 +203,9 @@ extern "C"
 
 /*!
  * Band 0 definition
- * { DutyCycle, TxMaxPower, LastJoinTxDoneTime, LastTxDoneTime, TimeOff }
+ * Band = { DutyCycle, TxMaxPower, LastBandUpdateTime, LastMaxCreditAssignTime, TimeCredits, MaxTimeCredits, ReadyForTransmission }
  */
-#define KR920_BAND0                                 { 1 , KR920_MAX_TX_POWER, 0, 0, 0 } //  100.0 %
+#define KR920_BAND0                                 { 1 , KR920_MAX_TX_POWER, 0, 0, 0, 0, 0 } //  100.0 %
 
 /*!
  * LoRaMac default channel 1
@@ -291,14 +251,9 @@ static const uint8_t DataratesKR920[]  = { 12, 11, 10,  9,  8,  7 };
 static const uint32_t BandwidthsKR920[] = { 125000, 125000, 125000, 125000, 125000, 125000 };
 
 /*!
- * Maximum payload with respect to the datarate index. Can operate with and without a repeater.
+ * Maximum payload with respect to the datarate index.
  */
 static const uint8_t MaxPayloadOfDatarateKR920[] = { 51, 51, 51, 115, 242, 242 };
-
-/*!
- * Maximum payload with respect to the datarate index. Can operate with repeater.
- */
-static const uint8_t MaxPayloadOfDatarateRepeaterKR920[] = { 51, 51, 51, 115, 222, 222 };
 
 /*!
  * \brief The function gets a value of a specific phy attribute.
@@ -454,13 +409,6 @@ uint8_t RegionKR920DlChannelReq( DlChannelReqParams_t* dlChannelReq );
  * \retval Datarate to apply.
  */
 int8_t RegionKR920AlternateDr( int8_t currentDr, AlternateDrType_t type );
-
-/*!
- * \brief Calculates the back-off time.
- *
- * \param [IN] calcBackOff Pointer to the function parameters.
- */
-void RegionKR920CalcBackOff( CalcBackOffParams_t* calcBackOff );
 
 /*!
  * \brief Searches and set the next random available channel

@@ -23,7 +23,7 @@ cmake_minimum_required(VERSION 3.6)
 #---------------------------------------------------------------------------------------
 
 # Allow switching of target platform
-set(BOARD_LIST NAMote72 NucleoL073 NucleoL152 NucleoL476 SAML21 SKiM880B SKiM980A SKiM881AXL B-L072Z-LRWAN1)
+set(BOARD_LIST NAMote72 NucleoL073 NucleoL152 NucleoL476 SAMR34 SKiM880B SKiM980A SKiM881AXL B-L072Z-LRWAN1)
 set(BOARD NucleoL073 CACHE STRING "Default target platform is NucleoL073")
 set_property(CACHE BOARD PROPERTY STRINGS ${BOARD_LIST})
 
@@ -31,6 +31,11 @@ set_property(CACHE BOARD PROPERTY STRINGS ${BOARD_LIST})
 set(MBED_RADIO_SHIELD_LIST SX1272MB2DAS SX1276MB1LAS SX1276MB1MAS SX1261MBXBAS SX1262MBXCAS SX1262MBXDAS )
 set(MBED_RADIO_SHIELD SX1261MBXBAS CACHE STRING "Default MBED radio shield is SX1261MBXBAS")
 set_property(CACHE MBED_RADIO_SHIELD PROPERTY STRINGS ${MBED_RADIO_SHIELD_LIST})
+
+# Allow switching of secure-elements
+set(SECURE_ELEMENT_LIST SOFT_SE LR1110_SE)
+set(SECURE_ELEMENT SOFT_SE CACHE STRING "Default secure element is SOFT_SE")
+set_property(CACHE SECURE_ELEMENT PROPERTY STRINGS ${SECURE_ELEMENT_LIST})
 
 # Allow switching of Applications
 set(APPLICATION_LIST LoRaMac ping-pong rx-sensi tx-cw )
@@ -76,8 +81,10 @@ elseif(BOARD STREQUAL NucleoL073)
         set(RADIO sx1276 CACHE INTERNAL "Radio sx1276 selected")
     elseif(MBED_RADIO_SHIELD STREQUAL SX1261MBXBAS OR MBED_RADIO_SHIELD STREQUAL SX1262MBXCAS OR MBED_RADIO_SHIELD STREQUAL SX1262MBXDAS)
         set(RADIO sx126x CACHE INTERNAL "Radio sx126x selected")
+    elseif(MBED_RADIO_SHIELD STREQUAL LR1110MB1XXS)
+        set(RADIO lr1110 CACHE INTERNAL "Radio lr1110 selected")
     else()
-        message(STATUS "Please specify the MBED_RADIO_SHIELD!\nPossible values are: SX1272MB2DAS, SX1276MB1LAS, SX1276MB1MAS, SX1261MBXBAS, SX1262MBXCAS and SX1262MBXDAS.")
+        message(STATUS "Please specify the MBED_RADIO_SHIELD!\nPossible values are: SX1272MB2DAS, SX1276MB1LAS, SX1276MB1MAS, SX1261MBXBAS, SX1262MBXCAS, SX1262MBXDAS and LR1110MB1XXS.")
     endif()
 
 elseif(BOARD STREQUAL NucleoL152)
@@ -95,8 +102,10 @@ elseif(BOARD STREQUAL NucleoL152)
         set(RADIO sx1276 CACHE INTERNAL "Radio sx1276 selected")
     elseif(MBED_RADIO_SHIELD STREQUAL SX1261MBXBAS OR MBED_RADIO_SHIELD STREQUAL SX1262MBXCAS OR MBED_RADIO_SHIELD STREQUAL SX1262MBXDAS)
         set(RADIO sx126x CACHE INTERNAL "Radio sx126x selected")
+    elseif(MBED_RADIO_SHIELD STREQUAL LR1110MB1XXS)
+        set(RADIO lr1110 CACHE INTERNAL "Radio lr1110 selected")
     else()
-        message(STATUS "Please specify the MBED_RADIO_SHIELD!\nPossible values are: SX1272MB2DAS, SX1276MB1LAS, SX1276MB1MAS, SX1261MBXBAS, SX1262MBXCAS and SX1262MBXDAS.")
+        message(STATUS "Please specify the MBED_RADIO_SHIELD!\nPossible values are: SX1272MB2DAS, SX1276MB1LAS, SX1276MB1MAS, SX1261MBXBAS, SX1262MBXCAS, SX1262MBXDAS and  LR1110MB1XXS.")
     endif()
 
 elseif(BOARD STREQUAL NucleoL476)
@@ -114,17 +123,19 @@ elseif(BOARD STREQUAL NucleoL476)
         set(RADIO sx1276 CACHE INTERNAL "Radio sx1276 selected")
     elseif(MBED_RADIO_SHIELD STREQUAL SX1261MBXBAS OR MBED_RADIO_SHIELD STREQUAL SX1262MBXCAS OR MBED_RADIO_SHIELD STREQUAL SX1262MBXDAS)
         set(RADIO sx126x CACHE INTERNAL "Radio sx126x selected")
+    elseif(MBED_RADIO_SHIELD STREQUAL LR1110MB1XXS)
+        set(RADIO lr1110 CACHE INTERNAL "Radio lr1110 selected")
     else()
-        message(STATUS "Please specify the MBED_RADIO_SHIELD!\nPossible values are: SX1272MB2DAS, SX1276MB1LAS, SX1276MB1MAS, SX1261MBXBAS, SX1262MBXCAS and SX1262MBXDAS.")
+        message(STATUS "Please specify the MBED_RADIO_SHIELD!\nPossible values are: SX1272MB2DAS, SX1276MB1LAS, SX1276MB1MAS, SX1261MBXBAS, SX1262MBXCAS, SX1262MBXDAS and  LR1110MB1XXS.")
     endif()
 
-elseif(BOARD STREQUAL SAML21)
-    # Configure toolchain for SAML21
+elseif(BOARD STREQUAL SAMR34)
+    # Configure toolchain for SAMR34
     set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/boards/mcu/saml21/saml21b/gcc/gcc/saml21j18b_flash.ld)
-    include(saml21)
+    include(samr34)
 
     # Build platform specific board implementation
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/boards/SAML21)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/boards/SAMR34)
 
     # Configure radio
     set(RADIO sx1276 CACHE INTERNAL "Radio sx1276 selected")

@@ -46,7 +46,20 @@ extern "C"
 #include <stdint.h>
 #include "LoRaMacCrypto.h"
 
-#define SE_EUI_SIZE             16
+/*!
+ * Secure-element keys size in bytes
+ */
+#define SE_KEY_SIZE             16
+
+/*!
+ * Secure-element EUI size in bytes
+ */
+#define SE_EUI_SIZE             8
+
+/*!
+ * Secure-element pin size in bytes
+ */
+#define SE_PIN_SIZE             4
 
 /*!
  * Return values.
@@ -81,6 +94,10 @@ typedef enum eSecureElementStatus
      * Undefined Error occurred
      */
     SECURE_ELEMENT_ERROR,
+    /*!
+     * Failed to encrypt
+     */
+    SECURE_ELEMENT_FAIL_ENCRYPT,
 }SecureElementStatus_t;
 
 /*!
@@ -161,13 +178,28 @@ SecureElementStatus_t SecureElementAesEncrypt( uint8_t* buffer, uint16_t size, K
 /*!
  * Derives and store a key
  *
- * \param[IN]  version        - LoRaWAN specification version currently in use.
  * \param[IN]  input          - Input data from which the key is derived ( 16 byte )
  * \param[IN]  rootKeyID      - Key identifier of the root key to use to perform the derivation
  * \param[IN]  targetKeyID    - Key identifier of the key which will be derived
  * \retval                    - Status of the operation
  */
-SecureElementStatus_t SecureElementDeriveAndStoreKey( Version_t version, uint8_t* input, KeyIdentifier_t rootKeyID, KeyIdentifier_t targetKeyID );
+SecureElementStatus_t SecureElementDeriveAndStoreKey( uint8_t* input, KeyIdentifier_t rootKeyID, KeyIdentifier_t targetKeyID );
+
+/*!
+ * Process JoinAccept message.
+ *
+ * \param[IN]  encJoinAccept     - Received encrypted JoinAccept message
+ * \param[IN]  encJoinAcceptSize - Received encrypted JoinAccept message Size
+ * \param[OUT] decJoinAccept     - Decrypted and validated JoinAccept message
+ * \param[OUT] versionMinor      - Detected LoRaWAN specification version minor field.
+ *                                     - 0 -> LoRaWAN 1.0.x
+ *                                     - 1 -> LoRaWAN 1.1.x
+ * \retval                       - Status of the operation
+ */
+SecureElementStatus_t SecureElementProcessJoinAccept( JoinReqIdentifier_t joinReqType, uint8_t* joinEui,
+                                                      uint16_t devNonce, uint8_t* encJoinAccept,
+                                                      uint8_t encJoinAcceptSize, uint8_t* decJoinAccept,
+                                                      uint8_t* versionMinor );
 
 /*!
  * Generates a random number
@@ -180,7 +212,7 @@ SecureElementStatus_t SecureElementRandomNumber( uint32_t* randomNum );
 /*!
  * Sets the DevEUI
  *
- * \param[IN] devEui          - Pointer to the 16-byte devEUI
+ * \param[IN] devEui          - Pointer to the 8-byte devEUI
  * \retval                    - Status of the operation
  */
 SecureElementStatus_t SecureElementSetDevEui( uint8_t* devEui );
@@ -188,14 +220,14 @@ SecureElementStatus_t SecureElementSetDevEui( uint8_t* devEui );
 /*!
  * Gets the DevEUI
  *
- * \retval                    - Pointer to the 16-byte devEUI
+ * \retval                    - Pointer to the 8-byte devEUI
  */
 uint8_t* SecureElementGetDevEui( void );
 
 /*!
  * Sets the JoinEUI
  *
- * \param[IN] joinEui         - Pointer to the 16-byte joinEui
+ * \param[IN] joinEui         - Pointer to the 8-byte joinEui
  * \retval                    - Status of the operation
  */
 SecureElementStatus_t SecureElementSetJoinEui( uint8_t* joinEui );
@@ -203,9 +235,24 @@ SecureElementStatus_t SecureElementSetJoinEui( uint8_t* joinEui );
 /*!
  * Gets the DevEUI
  *
- * \retval                    - Pointer to the 16-byte joinEui
+ * \retval                    - Pointer to the 8-byte joinEui
  */
 uint8_t* SecureElementGetJoinEui( void );
+
+/*!
+ * Sets the pin
+ *
+ * \param[IN] pin             - Pointer to the 4-byte pin
+ * \retval                    - Status of the operation
+ */
+SecureElementStatus_t SecureElementSetPin( uint8_t* pin );
+
+/*!
+ * Gets the Pin
+ *
+ * \retval                    - Pointer to the 4-byte pin
+ */
+uint8_t* SecureElementGetPin( void );
 
 /*! \} defgroup SECUREELEMENT */
 

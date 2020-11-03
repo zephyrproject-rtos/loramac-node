@@ -150,14 +150,18 @@ static TimerEvent_t LedBeaconTimer;
 static void OnMacProcessNotify( void );
 static void OnNvmContextChange( LmHandlerNvmContextStates_t state );
 static void OnNetworkParametersChange( CommissioningParams_t* params );
-static void OnMacMcpsRequest( LoRaMacStatus_t status, McpsReq_t *mcpsReq );
-static void OnMacMlmeRequest( LoRaMacStatus_t status, MlmeReq_t *mlmeReq );
+static void OnMacMcpsRequest( LoRaMacStatus_t status, McpsReq_t *mcpsReq, TimerTime_t nextTxIn );
+static void OnMacMlmeRequest( LoRaMacStatus_t status, MlmeReq_t *mlmeReq, TimerTime_t nextTxIn );
 static void OnJoinRequest( LmHandlerJoinParams_t* params );
 static void OnTxData( LmHandlerTxParams_t* params );
 static void OnRxData( LmHandlerAppData_t* appData, LmHandlerRxParams_t* params );
 static void OnClassChange( DeviceClass_t deviceClass );
 static void OnBeaconStatusChange( LoRaMAcHandlerBeaconParams_t* params );
-
+#if( LMH_SYS_TIME_UPDATE_NEW_API == 1 )
+static void OnSysTimeUpdate( bool isSynchronized, int32_t timeCorrection );
+#else
+static void OnSysTimeUpdate( void );
+#endif
 static void PrepareTxFrame( void );
 static void StartTxProcess( LmHandlerTxEvents_t txEvent );
 static void UplinkProcess( void );
@@ -191,7 +195,6 @@ static LmHandlerCallbacks_t LmHandlerCallbacks =
 {
     .GetBatteryLevel = BoardGetBatteryLevel,
     .GetTemperature = NULL,
-    .GetUniqueId = BoardGetUniqueId,
     .GetRandomSeed = BoardGetRandomSeed,
     .OnMacProcess = OnMacProcessNotify,
     .OnNvmContextChange = OnNvmContextChange,
@@ -202,7 +205,8 @@ static LmHandlerCallbacks_t LmHandlerCallbacks =
     .OnTxData = OnTxData,
     .OnRxData = OnRxData,
     .OnClassChange= OnClassChange,
-    .OnBeaconStatusChange = OnBeaconStatusChange
+    .OnBeaconStatusChange = OnBeaconStatusChange,
+    .OnSysTimeUpdate = OnSysTimeUpdate,
 };
 
 static LmHandlerParams_t LmHandlerParams =
@@ -261,8 +265,8 @@ int main( void )
     TimerInit( &LedBeaconTimer, OnLedBeaconTimerEvent );
     TimerSetValue( &LedBeaconTimer, 5000 );
 
-    const Version_t appVersion = { .Fields.Major = 1, .Fields.Minor = 0, .Fields.Revision = 0 };
-    const Version_t gitHubVersion = { .Fields.Major = 4, .Fields.Minor = 4, .Fields.Revision = 3 };
+    const Version_t appVersion = { .Fields.Major = 1, .Fields.Minor = 0, .Fields.Patch = 0 };
+    const Version_t gitHubVersion = { .Fields.Major = 4, .Fields.Minor = 4, .Fields.Patch = 5 };
     DisplayAppInfo( "periodic-uplink-lpp", 
                     &appVersion,
                     &gitHubVersion );
@@ -275,6 +279,9 @@ int main( void )
         {
         }
     }
+
+    // Set system maximum tolerated rx error in milliseconds
+    LmHandlerSetSystemMaxRxError( 20 );
 
     // The LoRa-Alliance Compliance protocol package should always be
     // initialized and activated.
@@ -322,14 +329,14 @@ static void OnNetworkParametersChange( CommissioningParams_t* params )
     DisplayNetworkParametersUpdate( params );
 }
 
-static void OnMacMcpsRequest( LoRaMacStatus_t status, McpsReq_t *mcpsReq )
+static void OnMacMcpsRequest( LoRaMacStatus_t status, McpsReq_t *mcpsReq, TimerTime_t nextTxIn )
 {
-    DisplayMacMcpsRequestUpdate( status, mcpsReq );
+    DisplayMacMcpsRequestUpdate( status, mcpsReq, nextTxIn );
 }
 
-static void OnMacMlmeRequest( LoRaMacStatus_t status, MlmeReq_t *mlmeReq )
+static void OnMacMlmeRequest( LoRaMacStatus_t status, MlmeReq_t *mlmeReq, TimerTime_t nextTxIn )
 {
-    DisplayMacMlmeRequestUpdate( status, mlmeReq );
+    DisplayMacMlmeRequestUpdate( status, mlmeReq, nextTxIn );
 }
 
 static void OnJoinRequest( LmHandlerJoinParams_t* params )
@@ -409,6 +416,18 @@ static void OnBeaconStatusChange( LoRaMAcHandlerBeaconParams_t* params )
 
     DisplayBeaconUpdate( params );
 }
+
+#if( LMH_SYS_TIME_UPDATE_NEW_API == 1 )
+static void OnSysTimeUpdate( bool isSynchronized, int32_t timeCorrection )
+{
+
+}
+#else
+static void OnSysTimeUpdate( void )
+{
+
+}
+#endif
 
 /*!
  * Prepares the payload of the frame and transmits it.

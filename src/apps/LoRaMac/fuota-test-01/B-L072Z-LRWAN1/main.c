@@ -87,7 +87,7 @@
  *
  * \remark Please note that ETSI mandates duty cycled transmissions. Use only for test purposes
  */
-#define LORAWAN_DUTYCYCLE_ON                        false
+#define LORAWAN_DUTYCYCLE_ON                        true
 
 /*!
  *
@@ -131,8 +131,8 @@ static TimerEvent_t LedBeaconTimer;
 static void OnMacProcessNotify( void );
 static void OnNvmContextChange( LmHandlerNvmContextStates_t state );
 static void OnNetworkParametersChange( CommissioningParams_t* params );
-static void OnMacMcpsRequest( LoRaMacStatus_t status, McpsReq_t *mcpsReq );
-static void OnMacMlmeRequest( LoRaMacStatus_t status, MlmeReq_t *mlmeReq );
+static void OnMacMcpsRequest( LoRaMacStatus_t status, McpsReq_t *mcpsReq, TimerTime_t nextTxIn );
+static void OnMacMlmeRequest( LoRaMacStatus_t status, MlmeReq_t *mlmeReq, TimerTime_t nextTxIn );
 static void OnJoinRequest( LmHandlerJoinParams_t* params );
 static void OnTxData( LmHandlerTxParams_t* params );
 static void OnRxData( LmHandlerAppData_t* appData, LmHandlerRxParams_t* params );
@@ -144,8 +144,8 @@ static void OnSysTimeUpdate( bool isSynchronized, int32_t timeCorrection );
 static void OnSysTimeUpdate( void );
 #endif
 #if( FRAG_DECODER_FILE_HANDLING_NEW_API == 1 )
-static uint8_t FragDecoderWrite( uint32_t addr, uint8_t *data, uint32_t size );
-static uint8_t FragDecoderRead( uint32_t addr, uint8_t *data, uint32_t size );
+static int8_t FragDecoderWrite( uint32_t addr, uint8_t *data, uint32_t size );
+static int8_t FragDecoderRead( uint32_t addr, uint8_t *data, uint32_t size );
 #endif
 static void OnFragProgress( uint16_t fragCounter, uint16_t fragNb, uint8_t fragSize, uint16_t fragNbLost );
 #if( FRAG_DECODER_FILE_HANDLING_NEW_API == 1 )
@@ -195,7 +195,6 @@ static LmHandlerCallbacks_t LmHandlerCallbacks =
 {
     .GetBatteryLevel = BoardGetBatteryLevel,
     .GetTemperature = NULL,
-    .GetUniqueId = BoardGetUniqueId,
     .GetRandomSeed = BoardGetRandomSeed,
     .OnMacProcess = OnMacProcessNotify,
     .OnNvmContextChange = OnNvmContextChange,
@@ -321,8 +320,8 @@ int main( void )
     TimerInit( &LedBeaconTimer, OnLedBeaconTimerEvent );
     TimerSetValue( &LedBeaconTimer, 5000 );
 
-    const Version_t appVersion = { .Fields.Major = 1, .Fields.Minor = 0, .Fields.Revision = 0 };
-    const Version_t gitHubVersion = { .Fields.Major = 4, .Fields.Minor = 4, .Fields.Revision = 3 };
+    const Version_t appVersion = { .Fields.Major = 1, .Fields.Minor = 0, .Fields.Patch = 0 };
+    const Version_t gitHubVersion = { .Fields.Major = 4, .Fields.Minor = 4, .Fields.Patch = 5 };
     DisplayAppInfo( "fuota-test-01", 
                     &appVersion,
                     &gitHubVersion );
@@ -335,6 +334,9 @@ int main( void )
         {
         }
     }
+
+    // Set system maximum tolerated rx error in milliseconds
+    LmHandlerSetSystemMaxRxError( 20 );
 
     // The LoRa-Alliance Compliance protocol package should always be
     // initialized and activated.
@@ -388,14 +390,14 @@ static void OnNetworkParametersChange( CommissioningParams_t* params )
     DisplayNetworkParametersUpdate( params );
 }
 
-static void OnMacMcpsRequest( LoRaMacStatus_t status, McpsReq_t *mcpsReq )
+static void OnMacMcpsRequest( LoRaMacStatus_t status, McpsReq_t *mcpsReq, TimerTime_t nextTxIn )
 {
-    DisplayMacMcpsRequestUpdate( status, mcpsReq );
+    DisplayMacMcpsRequestUpdate( status, mcpsReq, nextTxIn );
 }
 
-static void OnMacMlmeRequest( LoRaMacStatus_t status, MlmeReq_t *mlmeReq )
+static void OnMacMlmeRequest( LoRaMacStatus_t status, MlmeReq_t *mlmeReq, TimerTime_t nextTxIn )
 {
-    DisplayMacMlmeRequestUpdate( status, mlmeReq );
+    DisplayMacMlmeRequestUpdate( status, mlmeReq, nextTxIn );
 }
 
 static void OnJoinRequest( LmHandlerJoinParams_t* params )
@@ -493,7 +495,7 @@ static void OnSysTimeUpdate( void )
 #endif
 
 #if( FRAG_DECODER_FILE_HANDLING_NEW_API == 1 )
-static uint8_t FragDecoderWrite( uint32_t addr, uint8_t *data, uint32_t size )
+static int8_t FragDecoderWrite( uint32_t addr, uint8_t *data, uint32_t size )
 {
     if( size >= UNFRAGMENTED_DATA_SIZE )
     {
@@ -506,7 +508,7 @@ static uint8_t FragDecoderWrite( uint32_t addr, uint8_t *data, uint32_t size )
     return 0; // Success
 }
 
-static uint8_t FragDecoderRead( uint32_t addr, uint8_t *data, uint32_t size )
+static int8_t FragDecoderRead( uint32_t addr, uint8_t *data, uint32_t size )
 {
     if( size >= UNFRAGMENTED_DATA_SIZE )
     {
@@ -526,12 +528,12 @@ static void OnFragProgress( uint16_t fragCounter, uint16_t fragNb, uint8_t fragS
     GpioWrite( &Led3, 0 );
     TimerStart( &Led3Timer );
 
-    printf( "\r\n###### =========== FRAG_DECODER ============ ######\r\n" );
-    printf( "######               PROGRESS                ######\r\n");
-    printf( "###### ===================================== ######\r\n");
-    printf( "RECEIVED    : %5d / %5d Fragments\r\n", fragCounter, fragNb );
-    printf( "              %5d / %5d Bytes\r\n", fragCounter * fragSize, fragNb * fragSize );
-    printf( "LOST        :       %7d Fragments\r\n\r\n", fragNbLost );
+    printf( "\n###### =========== FRAG_DECODER ============ ######\n" );
+    printf( "######               PROGRESS                ######\n");
+    printf( "###### ===================================== ######\n");
+    printf( "RECEIVED    : %5d / %5d Fragments\n", fragCounter, fragNb );
+    printf( "              %5d / %5d Bytes\n", fragCounter * fragSize, fragNb * fragSize );
+    printf( "LOST        :       %7d Fragments\n\n", fragNbLost );
 }
 
 #if( FRAG_DECODER_FILE_HANDLING_NEW_API == 1 )
@@ -542,11 +544,11 @@ static void OnFragDone( int32_t status, uint32_t size )
     // Switch LED 3 OFF
     GpioWrite( &Led3, 0 );
 
-    printf( "\r\n###### =========== FRAG_DECODER ============ ######\r\n" );
-    printf( "######               FINISHED                ######\r\n");
-    printf( "###### ===================================== ######\r\n");
-    printf( "STATUS      : %ld\r\n", status );
-    printf( "CRC         : %08lX\r\n\r\n", FileRxCrc );
+    printf( "\n###### =========== FRAG_DECODER ============ ######\n" );
+    printf( "######               FINISHED                ######\n");
+    printf( "###### ===================================== ######\n");
+    printf( "STATUS      : %ld\n", status );
+    printf( "CRC         : %08lX\n\n", FileRxCrc );
 }
 #else
 static void OnFragDone( int32_t status, uint8_t *file, uint32_t size )
@@ -556,11 +558,11 @@ static void OnFragDone( int32_t status, uint8_t *file, uint32_t size )
     // Switch LED 3 OFF
     GpioWrite( &Led3, 0 );
 
-    printf( "\r\n###### =========== FRAG_DECODER ============ ######\r\n" );
-    printf( "######               FINISHED                ######\r\n");
-    printf( "###### ===================================== ######\r\n");
-    printf( "STATUS      : %ld\r\n", status );
-    printf( "CRC         : %08lX\r\n\r\n", FileRxCrc );
+    printf( "\n###### =========== FRAG_DECODER ============ ######\n" );
+    printf( "######               FINISHED                ######\n");
+    printf( "###### ===================================== ######\n");
+    printf( "STATUS      : %ld\n", status );
+    printf( "CRC         : %08lX\n\n", FileRxCrc );
 }
 #endif
 

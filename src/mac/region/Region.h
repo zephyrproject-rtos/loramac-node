@@ -62,11 +62,21 @@ extern "C"
 #include "utilities.h"
 #include "LoRaMac.h"
 #include "timer.h"
+#include "RegionCommon.h"
 
 /*!
  * Macro to compute bit of a channel index.
  */
 #define LC( channelIndex )                          ( uint16_t )( 1 << ( channelIndex - 1 ) )
+
+#ifndef REGION_VERSION
+/*!
+ * Regional parameters version definition.
+ */
+#define REGION_VERSION                              0x00010003
+#endif
+
+
 
 /*!
  * Region       | SF
@@ -640,10 +650,6 @@ typedef enum ePhyAttribute
      */
     PHY_MAX_PAYLOAD,
     /*!
-     * Maximum payload possible when repeater support is enabled.
-     */
-    PHY_MAX_PAYLOAD_REPEATER,
-    /*!
      * Duty cycle.
      */
     PHY_DUTY_CYCLE,
@@ -790,17 +796,33 @@ typedef enum ePhyAttribute
      */
     PHY_BEACON_CHANNEL_DR,
     /*!
-     * The frequency stepwidth between the beacon channels.
-     */
-    PHY_BEACON_CHANNEL_STEPWIDTH,
-    /*!
      * The number of channels for the beacon reception.
      */
     PHY_BEACON_NB_CHANNELS,
     /*!
+     * The static offset for the downlink channel calculation.
+     */
+    PHY_BEACON_CHANNEL_OFFSET,
+    /*!
+     * Ping slot channel frequency.
+     */
+    PHY_PING_SLOT_CHANNEL_FREQ,
+    /*!
      * The datarate of a ping slot channel.
      */
-    PHY_PING_SLOT_CHANNEL_DR
+    PHY_PING_SLOT_CHANNEL_DR,
+    /*!
+     * The number of channels for the ping slot reception.
+     */
+    PHY_PING_SLOT_NB_CHANNELS,
+    /*!
+     * The equivalent spreading factor value from datarate
+     */
+    PHY_SF_FROM_DR,
+    /*!
+     * The equivalent bandwith index from datarate
+     */
+    PHY_BW_FROM_DR,
 }PhyAttribute_t;
 
 /*!
@@ -809,14 +831,22 @@ typedef enum ePhyAttribute
 typedef enum eInitType
 {
     /*!
-     * Initializes the region specific data to defaults, according to the
-     * LoRaWAN specification.
+     * Initializes the regional default settings for the band,
+     * channel and default channels mask. Some regions also initiate
+     * other default configurations. In general, this type is intended
+     * to be called once during the initialization.
      */
-    INIT_TYPE_INIT,
+    INIT_TYPE_DEFAULTS,
     /*!
-     * Restores default channels defined by the LoRaWAN specification only.
+     * Resets the channels mask to the default channels. Deactivates
+     * all other channels.
      */
-    INIT_TYPE_RESTORE_DEFAULT_CHANNELS,
+    INIT_TYPE_RESET_TO_DEFAULT_CHANNELS,
+    /*!
+     * Activates the default channels. Leaves all other active channels
+     * active.
+     */
+    INIT_TYPE_ACTIVATE_DEFAULT_CHANNELS,
     /*!
      * Restores internal context from passed pointer.
      */
@@ -879,6 +909,10 @@ typedef union uPhyParam
      * Beacon format
      */
     BeaconFormat_t BeaconFormat;
+    /*!
+     * Duty Cycle Period
+     */
+    TimerTime_t DutyCycleTimePeriod;
 }PhyParam_t;
 
 /*!
@@ -893,23 +927,29 @@ typedef struct sGetPhyParams
     /*!
      * Datarate.
      * The parameter is needed for the following queries:
-     * PHY_MAX_PAYLOAD, PHY_MAX_PAYLOAD_REPEATER, PHY_NEXT_LOWER_TX_DR.
+     * PHY_MAX_PAYLOAD, PHY_NEXT_LOWER_TX_DR, PHY_SF_FROM_DR, PHY_BW_FROM_DR.
      */
     int8_t Datarate;
     /*!
      * Uplink dwell time. This parameter must be set to query:
-     * PHY_MAX_PAYLOAD, PHY_MAX_PAYLOAD_REPEATER, PHY_MIN_TX_DR.
+     * PHY_MAX_PAYLOAD, PHY_MIN_TX_DR.
      * The parameter is needed for the following queries:
-     * PHY_MIN_TX_DR, PHY_MAX_PAYLOAD, PHY_MAX_PAYLOAD_REPEATER, PHY_NEXT_LOWER_TX_DR.
+     * PHY_MIN_TX_DR, PHY_MAX_PAYLOAD, PHY_NEXT_LOWER_TX_DR.
      */
     uint8_t UplinkDwellTime;
     /*!
      * Downlink dwell time. This parameter must be set to query:
-     * PHY_MAX_PAYLOAD, PHY_MAX_PAYLOAD_REPEATER, PHY_MIN_RX_DR.
+     * PHY_MAX_PAYLOAD, PHY_MIN_RX_DR.
      * The parameter is needed for the following queries:
-     * PHY_MIN_RX_DR, PHY_MAX_PAYLOAD, PHY_MAX_PAYLOAD_REPEATER.
+     * PHY_MIN_RX_DR, PHY_MAX_PAYLOAD.
      */
     uint8_t DownlinkDwellTime;
+    /*!
+     * Specification of the downlink channel. Used in Class B only.
+     * The parameter is needed for the following queries:
+     * PHY_BEACON_CHANNEL_FREQ, PHY_PING_SLOT_CHANNEL_FREQ
+     */
+    uint8_t Channel;
 }GetPhyParams_t;
 
 /*!
@@ -929,6 +969,14 @@ typedef struct sSetBandTxDoneParams
      * Last TX done time.
      */
     TimerTime_t LastTxDoneTime;
+    /*!
+     * Time-on-air of the last transmission.
+     */
+    TimerTime_t LastTxAirTime;
+    /*!
+     * Elapsed time since initialization.
+     */
+    SysTime_t ElapsedTimeSinceStartUp;
 }SetBandTxDoneParams_t;
 
 /*!
@@ -1062,10 +1110,6 @@ typedef struct sRxConfigParams
      * Downlink dwell time.
      */
     uint8_t DownlinkDwellTime;
-    /*!
-     * Set to true, if a repeater is supported.
-     */
-    bool RepeaterSupport;
     /*!
      * Set to true, if RX should be continuous.
      */
@@ -1230,37 +1274,6 @@ typedef enum eAlternateDrType
 }AlternateDrType_t;
 
 /*!
- * Parameter structure for the function RegionCalcBackOff.
- */
-typedef struct sCalcBackOffParams
-{
-    /*!
-     * Set to true, if the node has already joined a network, otherwise false.
-     */
-    bool Joined;
-    /*!
-     * Joined Set to true, if the last uplink was a join request
-     */
-    bool LastTxIsJoinRequest;
-    /*!
-     * Set to true, if the duty cycle is enabled, otherwise false.
-     */
-    bool DutyCycleEnabled;
-    /*!
-     * Current channel index.
-     */
-    uint8_t Channel;
-    /*!
-     * Elapsed time since the start of the node.
-     */
-    SysTime_t ElapsedTime;
-    /*!
-     * Time-on-air of the last transmission.
-     */
-    TimerTime_t TxTimeOnAir;
-}CalcBackOffParams_t;
-
-/*!
  * Parameter structure for the function RegionNextChannel.
  */
 typedef struct sNextChanParams
@@ -1285,6 +1298,18 @@ typedef struct sNextChanParams
      * Set to true, if the duty cycle is enabled, otherwise false.
      */
     bool DutyCycleEnabled;
+    /*!
+     * Elapsed time since the start of the node.
+     */
+    SysTime_t ElapsedTimeSinceStartUp;
+    /*!
+     * Joined Set to true, if the last uplink was a join request
+     */
+    bool LastTxIsJoinRequest;
+    /*!
+     * Payload length of the next frame
+     */
+    uint16_t PktLen;
 }NextChanParams_t;
 
 /*!
@@ -1611,15 +1636,6 @@ uint8_t RegionDlChannelReq( LoRaMacRegion_t region, DlChannelReqParams_t* dlChan
 int8_t RegionAlternateDr( LoRaMacRegion_t region, int8_t currentDr, AlternateDrType_t type );
 
 /*!
- * \brief Calculates the back-off time.
- *
- * \param [IN] region LoRaWAN region.
- *
- * \param [IN] calcBackOff Pointer to the function parameters.
- */
-void RegionCalcBackOff( LoRaMacRegion_t region, CalcBackOffParams_t* calcBackOff );
-
-/*!
  * \brief Searches and set the next random available channel
  *
  * \param [IN] region LoRaWAN region.
@@ -1687,6 +1703,13 @@ uint8_t RegionApplyDrOffset( LoRaMacRegion_t region, uint8_t downlinkDwellTime, 
  * \param [out] outDr Datarate used to receive the beacon
  */
 void RegionRxBeaconSetup( LoRaMacRegion_t region, RxBeaconSetup_t* rxBeaconSetup, uint8_t* outDr );
+
+/*!
+ * \brief Gets the version of the regional parameters implementation.
+ *
+ * \retval Version of the regional parameters.
+ */
+Version_t RegionGetVersion( void );
 
 /*! \} defgroup REGION */
 

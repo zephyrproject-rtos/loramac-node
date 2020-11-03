@@ -34,6 +34,8 @@
 
 #if defined( SX1261MBXBAS ) || defined( SX1262MBXCAS ) || defined( SX1262MBXDAS )
     #include "sx126x-board.h"
+#elif defined( LR1110MB1XXS )
+    #include "lr1110-board.h"
 #elif defined( SX1272MB2DAS)
     #include "sx1272-board.h"
 #elif defined( SX1276MB1LAS ) || defined( SX1276MB1MAS )
@@ -58,6 +60,10 @@ Gpio_t Led2;
  * MCU objects
  */
 Uart_t Uart2;
+
+#if defined( LR1110MB1XXS )
+    extern lr1110_t LR1110;
+#endif
 
 /*!
  * Initializes the unused GPIO to a know status
@@ -170,7 +176,10 @@ void BoardInitMcu( void )
 #if defined( SX1261MBXBAS ) || defined( SX1262MBXCAS ) || defined( SX1262MBXDAS )
     SpiInit( &SX126x.Spi, SPI_1, RADIO_MOSI, RADIO_MISO, RADIO_SCLK, NC );
     SX126xIoInit( );
-#elif defined( SX1272MB2DAS)
+#elif defined( LR1110MB1XXS )
+    SpiInit( &LR1110.spi, SPI_1, RADIO_MOSI, RADIO_MISO, RADIO_SCLK, NC );
+    lr1110_board_init_io( &LR1110 );
+#elif defined( SX1272MB2DAS )
     SpiInit( &SX1272.Spi, SPI_1, RADIO_MOSI, RADIO_MISO, RADIO_SCLK, NC );
     SX1272IoInit( );
 #elif defined( SX1276MB1LAS ) || defined( SX1276MB1MAS )
@@ -184,7 +193,10 @@ void BoardInitMcu( void )
 #if defined( SX1261MBXBAS ) || defined( SX1262MBXCAS ) || defined( SX1262MBXDAS )
         SX126xIoDbgInit( );
         // WARNING: If necessary the TCXO control is initialized by SX126xInit function.
-#elif defined( SX1272MB2DAS)
+#elif defined( LR1110MB1XXS )
+        lr1110_board_init_dbg_io( &LR1110 );
+        // WARNING: If necessary the TCXO control is initialized by SX126xInit function.
+#elif defined( SX1272MB2DAS )
         SX1272IoDbgInit( );
         SX1272IoTcxoInit( );
 #elif defined( SX1276MB1LAS ) || defined( SX1276MB1MAS )
@@ -211,7 +223,10 @@ void BoardDeInitMcu( void )
 #if defined( SX1261MBXBAS ) || defined( SX1262MBXCAS ) || defined( SX1262MBXDAS )
     SpiDeInit( &SX126x.Spi );
     SX126xIoDeInit( );
-#elif defined( SX1272MB2DAS)
+#elif defined( LR1110MB1XXS )
+    SpiDeInit( &LR1110.spi );
+    lr1110_board_deinit_io( &LR1110 );
+#elif defined( SX1272MB2DAS )
     SpiDeInit( &SX1272.Spi );
     SX1272IoDeInit( );
 #elif defined( SX1276MB1LAS ) || defined( SX1276MB1MAS )
@@ -237,7 +252,7 @@ void BoardGetUniqueId( uint8_t *id )
     id[0] = ( ( *( uint32_t* )ID2 ) );
 }
 
-uint16_t BoardBatteryMeasureVolage( void )
+uint16_t BoardBatteryMeasureVoltage( void )
 {
     return 0;
 }
@@ -261,9 +276,9 @@ static void BoardUnusedIoInit( void )
 
 void SystemClockConfig( void )
 {
-    RCC_OscInitTypeDef RCC_OscInitStruct;
-    RCC_ClkInitTypeDef RCC_ClkInitStruct;
-    RCC_PeriphCLKInitTypeDef PeriphClkInit;
+    RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
+    RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
+    RCC_PeriphCLKInitTypeDef PeriphClkInit = { 0 };
 
     __HAL_RCC_PWR_CLK_ENABLE( );
 
@@ -461,6 +476,8 @@ int _read( int fd, const void *buf, size_t count )
 
 #else
 
+#include <stdio.h>
+
 // Keil compiler
 int fputc( int c, FILE *stream )
 {
@@ -480,6 +497,9 @@ int fgetc( FILE *stream )
 #endif
 
 #ifdef USE_FULL_ASSERT
+
+#include <stdio.h>
+
 /*
  * Function Name  : assert_failed
  * Description    : Reports the name of the source file and the source line number
@@ -492,9 +512,9 @@ int fgetc( FILE *stream )
 void assert_failed( uint8_t* file, uint32_t line )
 {
     /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %lu\r\n", file, line) */
+     ex: printf("Wrong parameters value: file %s on line %lu\n", file, line) */
 
-    printf( "Wrong parameters value: file %s on line %lu\r\n", ( const char* )file, line );
+    printf( "Wrong parameters value: file %s on line %lu\n", ( const char* )file, line );
     /* Infinite loop */
     while( 1 )
     {

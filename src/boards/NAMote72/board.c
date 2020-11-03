@@ -312,7 +312,7 @@ void BoardGetUniqueId( uint8_t *id )
 
 static uint16_t BatteryVoltage = BATTERY_MAX_LEVEL;
 
-uint16_t BoardBatteryMeasureVolage( void )
+uint16_t BoardBatteryMeasureVoltage( void )
 {
     uint16_t vdd = 0;
     uint16_t vref = VREFINT_CAL;
@@ -350,7 +350,7 @@ uint8_t BoardGetBatteryLevel( void )
 {
     uint8_t batteryLevel = 0;
 
-    BatteryVoltage = BoardBatteryMeasureVolage( );
+    BatteryVoltage = BoardBatteryMeasureVoltage( );
 
     if( GetBoardPowerSource( ) == USB_POWER )
     {
@@ -659,6 +659,8 @@ int _read( int fd, const void *buf, size_t count )
 
 #else
 
+#include <stdio.h>
+
 // Keil compiler
 int fputc( int c, FILE *stream )
 {
@@ -678,6 +680,9 @@ int fgetc( FILE *stream )
 #endif
 
 #ifdef USE_FULL_ASSERT
+
+#include <stdio.h>
+
 /*
  * Function Name  : assert_failed
  * Description    : Reports the name of the source file and the source line number
@@ -690,9 +695,9 @@ int fgetc( FILE *stream )
 void assert_failed( uint8_t* file, uint32_t line )
 {
     /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %lu\r\n", file, line) */
+     ex: printf("Wrong parameters value: file %s on line %lu\n", file, line) */
 
-    printf( "Wrong parameters value: file %s on line %lu\r\n", ( const char* )file, line );
+    printf( "Wrong parameters value: file %s on line %lu\n", ( const char* )file, line );
     /* Infinite loop */
     while( 1 )
     {

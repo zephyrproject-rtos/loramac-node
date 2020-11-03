@@ -104,6 +104,11 @@
 #define FSK_BANDWIDTH                               100000    // Hz >> DSB in sx126x
 #define FSK_AFC_BANDWIDTH                           166666    // Hz >> Unused in sx126x
 
+#elif defined( LR1110MB1XXS )
+
+#define FSK_BANDWIDTH                               100000    // Hz >> DSB in LR1110
+#define FSK_AFC_BANDWIDTH                           166666    // Hz >> Unused in LR1110
+
 #else
     #error "Please define a mbed shield in the compiler options."
 #endif
@@ -153,12 +158,16 @@ int main( void )
                                    LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
                                    0, true, 0, 0, LORA_IQ_INVERSION_ON, true );
 
+    Radio.SetMaxPayloadLength( MODEM_LORA, 255 );
+
 #elif defined( USE_MODEM_FSK )
 
     Radio.SetRxConfig( MODEM_FSK, FSK_BANDWIDTH, FSK_DATARATE,
                                   0, FSK_AFC_BANDWIDTH, FSK_PREAMBLE_LENGTH,
                                   0, FSK_FIX_LENGTH_PAYLOAD_ON, 0, true,
                                   0, 0, false, true );
+
+    Radio.SetMaxPayloadLength( MODEM_FSK, 255 );
 
 #else
     #error "Please define a frequency band in the compiler options."

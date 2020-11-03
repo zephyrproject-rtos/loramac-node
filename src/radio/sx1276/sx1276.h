@@ -199,14 +199,16 @@ void SX1276SetChannel( uint32_t freq );
 /*!
  * \brief Checks if the channel is free for the given time
  *
- * \param [IN] modem      Radio modem to be used [0: FSK, 1: LoRa]
- * \param [IN] freq       Channel RF frequency
- * \param [IN] rssiThresh RSSI threshold
- * \param [IN] maxCarrierSenseTime Max time while the RSSI is measured
+ * \remark The FSK modem is always used for this task as we can select the Rx bandwidth at will.
+ *
+ * \param [IN] freq                Channel RF frequency in Hertz
+ * \param [IN] rxBandwidth         Rx bandwidth in Hertz
+ * \param [IN] rssiThresh          RSSI threshold in dBm
+ * \param [IN] maxCarrierSenseTime Max time in milliseconds while the RSSI is measured
  *
  * \retval isFree         [true: Channel is free, false: Channel is not free]
  */
-bool SX1276IsChannelFree( RadioModems_t modem, uint32_t freq, int16_t rssiThresh, uint32_t maxCarrierSenseTime );
+bool SX1276IsChannelFree( uint32_t freq, uint32_t rxBandwidth, int16_t rssiThresh, uint32_t maxCarrierSenseTime );
 
 /*!
  * \brief Generates a 32 bits random value based on the RSSI readings
@@ -317,12 +319,31 @@ void SX1276SetTxConfig( RadioModems_t modem, int8_t power, uint32_t fdev,
  *
  * \Remark Can only be called once SetRxConfig or SetTxConfig have been called
  *
- * \param [IN] modem      Radio modem to be used [0: FSK, 1: LoRa]
- * \param [IN] pktLen     Packet payload length
+ * \param [IN] modem        Radio modem to be used [0: FSK, 1: LoRa]
+ * \param [IN] bandwidth    Sets the bandwidth
+ *                          FSK : >= 2600 and <= 250000 Hz
+ *                          LoRa: [0: 125 kHz, 1: 250 kHz,
+ *                                 2: 500 kHz, 3: Reserved]
+ * \param [IN] datarate     Sets the Datarate
+ *                          FSK : 600..300000 bits/s
+ *                          LoRa: [6: 64, 7: 128, 8: 256, 9: 512,
+ *                                10: 1024, 11: 2048, 12: 4096  chips]
+ * \param [IN] coderate     Sets the coding rate (LoRa only)
+ *                          FSK : N/A ( set to 0 )
+ *                          LoRa: [1: 4/5, 2: 4/6, 3: 4/7, 4: 4/8]
+ * \param [IN] preambleLen  Sets the Preamble length
+ *                          FSK : Number of bytes
+ *                          LoRa: Length in symbols (the hardware adds 4 more symbols)
+ * \param [IN] fixLen       Fixed length packets [0: variable, 1: fixed]
+ * \param [IN] payloadLen   Sets payload length when fixed length is used
+ * \param [IN] crcOn        Enables/Disables the CRC [0: OFF, 1: ON]
  *
  * \retval airTime        Computed airTime (ms) for the given packet payload length
  */
-uint32_t SX1276GetTimeOnAir( RadioModems_t modem, uint8_t pktLen );
+uint32_t SX1276GetTimeOnAir( RadioModems_t modem, uint32_t bandwidth,
+                              uint32_t datarate, uint8_t coderate,
+                              uint16_t preambleLen, bool fixLen, uint8_t payloadLen,
+                              bool crcOn );
 
 /*!
  * \brief Sends the buffer of size. Prepares the packet to be sent and sets
@@ -376,7 +397,7 @@ int16_t SX1276ReadRssi( RadioModems_t modem );
  * \param [IN]: addr Register address
  * \param [IN]: data New register value
  */
-void SX1276Write( uint16_t addr, uint8_t data );
+void SX1276Write( uint32_t addr, uint8_t data );
 
 /*!
  * \brief Reads the radio register at the specified address
@@ -384,7 +405,7 @@ void SX1276Write( uint16_t addr, uint8_t data );
  * \param [IN]: addr Register address
  * \retval data Register value
  */
-uint8_t SX1276Read( uint16_t addr );
+uint8_t SX1276Read( uint32_t addr );
 
 /*!
  * \brief Writes multiple radio registers starting at address
@@ -393,7 +414,7 @@ uint8_t SX1276Read( uint16_t addr );
  * \param [IN] buffer Buffer containing the new register's values
  * \param [IN] size   Number of registers to be written
  */
-void SX1276WriteBuffer( uint16_t addr, uint8_t *buffer, uint8_t size );
+void SX1276WriteBuffer( uint32_t addr, uint8_t *buffer, uint8_t size );
 
 /*!
  * \brief Reads multiple radio registers starting at address
@@ -402,7 +423,7 @@ void SX1276WriteBuffer( uint16_t addr, uint8_t *buffer, uint8_t size );
  * \param [OUT] buffer Buffer where to copy the registers data
  * \param [IN] size Number of registers to be read
  */
-void SX1276ReadBuffer( uint16_t addr, uint8_t *buffer, uint8_t size );
+void SX1276ReadBuffer( uint32_t addr, uint8_t *buffer, uint8_t size );
 
 /*!
  * \brief Sets the maximum payload length.

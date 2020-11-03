@@ -16,9 +16,11 @@ zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/mac/LoRaMacCrypto
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/mac/LoRaMacParser.c)
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/mac/LoRaMacSerializer.c)
 
+target_compile_definitions(loramac-node PRIVATE -DSECURE_ELEMENT_PRE_PROVISIONED)
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/peripherals/soft-se/aes.c)
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/peripherals/soft-se/cmac.c)
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/peripherals/soft-se/soft-se.c)
+zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/peripherals/soft-se/soft-se-hal.c)
 
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_SX1272 ../src/radio/sx1272/sx1272.c)
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_SX1276 ../src/radio/sx1276/sx1276.c)
@@ -34,15 +36,15 @@ zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/boards/mcu/utilit
 
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/mac/region/Region.c)
 zephyr_library_sources_ifdef(CONFIG_HAS_SEMTECH_LORAMAC ../src/mac/region/RegionCommon.c)
-zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_EU868 ../src/mac/region/RegionEU868.c)
-zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_US915 ../src/mac/region/RegionUS915.c)
+zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_AS923 ../src/mac/region/RegionAS923.c)
+zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_AU915 ../src/mac/region/RegionAU915.c)
+zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_CN470 ../src/mac/region/RegionCN470.c)
 zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_CN779 ../src/mac/region/RegionCN779.c)
 zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_EU433 ../src/mac/region/RegionEU433.c)
-zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_AU915 ../src/mac/region/RegionAU915.c)
-zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_AS923 ../src/mac/region/RegionAS923.c)
-zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_CN470 ../src/mac/region/RegionCN470.c)
-zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_KR920 ../src/mac/region/RegionKR920.c)
+zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_EU868 ../src/mac/region/RegionEU868.c)
 zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_IN865 ../src/mac/region/RegionIN865.c)
+zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_KR920 ../src/mac/region/RegionKR920.c)
 zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_RU864 ../src/mac/region/RegionRU864.c)
+zephyr_library_sources_ifdef(CONFIG_LORAMAC_REGION_US915 ../src/mac/region/RegionUS915.c ../src/mac/region/Region/RegionBaseUS.c)
 
 endif()
