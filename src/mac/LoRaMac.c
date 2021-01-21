@@ -3567,6 +3567,15 @@ LoRaMacStatus_t LoRaMacMibGetRequestConfirm( MibRequestConfirm_t* mibGet )
             mibGet->Param.JoinAcceptDelay2 = MacCtx.NvmCtx->MacParams.JoinAcceptDelay2;
             break;
         }
+        case MIB_CHANNELS_MIN_TX_DATARATE:
+        {
+            getPhy.Attribute = PHY_MIN_TX_DR;
+            getPhy.UplinkDwellTime = MacCtx.NvmCtx->MacParams.UplinkDwellTime;
+            phyParam = RegionGetPhyParam( MacCtx.NvmCtx->Region, &getPhy );
+
+            mibGet->Param.ChannelsMinTxDatarate = phyParam.Value;
+            break;
+        }
         case MIB_CHANNELS_DEFAULT_DATARATE:
         {
             mibGet->Param.ChannelsDefaultDatarate = MacCtx.NvmCtx->MacParamsDefaults.ChannelsDatarate;
