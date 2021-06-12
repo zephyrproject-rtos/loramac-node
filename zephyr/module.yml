@@ -1,0 +1,5 @@
+name: loramac-node
+
+build:
+  cmake-ext: True
+  kconfig-ext: True
