@@ -40,21 +40,35 @@ extern "C" {
  *
  * \remark This parameter has an impact on the memory footprint.
  */
+#ifdef __ZEPHYR__
+#define FRAG_MAX_NB \
+    (CONFIG_LORAWAN_FRAG_TRANSPORT_IMAGE_SIZE / CONFIG_LORAWAN_FRAG_TRANSPORT_MIN_FRAG_SIZE + 1)
+#else
 #define FRAG_MAX_NB                                 21
+#endif
 
 /*!
  * Maximum fragment size that can be handled.
  *
  * \remark This parameter has an impact on the memory footprint.
  */
+#ifdef __ZEPHYR__
+#define FRAG_MAX_SIZE CONFIG_LORAWAN_FRAG_TRANSPORT_MAX_FRAG_SIZE
+#else
 #define FRAG_MAX_SIZE                               50
+#endif
 
 /*!
  * Maximum number of extra frames that can be handled.
  *
  * \remark This parameter has an impact on the memory footprint.
  */
+#ifdef __ZEPHYR__
+#define FRAG_MAX_REDUNDANCY \
+    (FRAG_MAX_NB * CONFIG_LORAWAN_FRAG_TRANSPORT_MAX_REDUNDANCY / 100)
+#else
 #define FRAG_MAX_REDUNDANCY                         5
+#endif
 
 #define FRAG_SESSION_FINISHED                       ( int32_t )0
 #define FRAG_SESSION_NOT_STARTED                    ( int32_t )-2
