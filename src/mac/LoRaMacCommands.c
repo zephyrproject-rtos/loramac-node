@@ -275,6 +275,9 @@ static bool IsSticky( uint8_t cid )
 {
     switch( cid )
     {
+        case MOTE_MAC_RESET_IND:
+        case MOTE_MAC_REKEY_IND:
+        case MOTE_MAC_DEVICE_MODE_IND:
         case MOTE_MAC_DL_CHANNEL_ANS:
         case MOTE_MAC_RX_PARAM_SETUP_ANS:
         case MOTE_MAC_RX_TIMING_SETUP_ANS:
@@ -478,32 +481,6 @@ LoRaMacCommandStatus_t LoRaMacCommandsSerializeCmds( size_t availableSize, size_
     return LORAMAC_COMMANDS_SUCCESS;
 }
 
-LoRaMacCommandStatus_t LoRaMacCommandsStickyCmdsPending( bool* cmdsPending )
-{
-    if( cmdsPending == NULL )
-    {
-        return LORAMAC_COMMANDS_ERROR_NPE;
-    }
-    MacCommand_t* curElement;
-    curElement = CommandsCtx.MacCommandList.First;
-
-    *cmdsPending = false;
-
-    // Loop through all elements
-    while( curElement != NULL )
-    {
-        if( curElement->IsSticky == true )
-        {
-            // Found one sticky MAC command
-            *cmdsPending = true;
-            return LORAMAC_COMMANDS_SUCCESS;
-        }
-        curElement = curElement->Next;
-    }
-
-    return LORAMAC_COMMANDS_SUCCESS;
-}
-
 uint8_t LoRaMacCommandsGetCmdSize( uint8_t cid )
 {
     uint8_t cidSize = 0;
@@ -511,6 +488,12 @@ uint8_t LoRaMacCommandsGetCmdSize( uint8_t cid )
     // Decode Frame MAC commands
     switch( cid )
     {
+        case SRV_MAC_RESET_CONF:
+        {
+            // cid + Serv_LoRaWAN_version
+            cidSize = 2;
+            break;
+        }
         case SRV_MAC_LINK_CHECK_ANS:
         {
             // cid + Margin + GwCnt
@@ -563,6 +546,36 @@ uint8_t LoRaMacCommandsGetCmdSize( uint8_t cid )
         {
             // cid + ChIndex + Frequency (3)
             cidSize = 5;
+            break;
+        }
+        case SRV_MAC_REKEY_CONF:
+        {
+            // cid + Serv_LoRaWAN_version
+            cidSize = 2;
+            break;
+        }
+        case SRV_MAC_ADR_PARAM_SETUP_REQ:
+        {
+            // cid + ADRparam
+            cidSize = 2;
+            break;
+        }
+        case SRV_MAC_FORCE_REJOIN_REQ:
+        {
+            // cid + Payload (2)
+            cidSize = 3;
+            break;
+        }
+        case SRV_MAC_REJOIN_PARAM_REQ:
+        {
+            // cid + Payload (1)
+            cidSize = 2;
+            break;
+        }
+        case SRV_MAC_DEVICE_MODE_CONF:
+        {
+            // cid + Class
+            cidSize = 2;
             break;
         }
         case SRV_MAC_DEVICE_TIME_ANS:
