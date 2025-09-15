@@ -71,10 +71,19 @@ void SX126xIoDbgInit( void );
  */
 void SX126xReset( void );
 
+#ifdef __ZEPHYR__
+/*!
+ * \brief Blocking loop to wait while the Busy pin in high
+ *
+ * \retval state 0 if device is not busy, negative error otherwise
+ */
+int SX126xWaitOnBusy(void);
+#else
 /*!
  * \brief Blocking loop to wait while the Busy pin in high
  */
-void SX126xWaitOnBusy( void );
+void SX126xWaitOnBusy(void);
+#endif
 
 /*!
  * \brief Wakes up the radio
